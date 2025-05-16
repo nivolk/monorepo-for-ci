@@ -1,0 +1,11 @@
+*.pyc
+__pycache__/
+*.log
+*.tar
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.out
+*.tmp
+Thumbs.db

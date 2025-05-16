@@ -1,0 +1,13 @@
+.github
+.gitignore
+.git
+.idea
+.vscode
+node_modules
+.next
+Dockerfile
+docker-compose.yml
+*.log
+*.swp
+__pycache__/
+*.pyc

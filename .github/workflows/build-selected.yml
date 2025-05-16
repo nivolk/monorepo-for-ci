@@ -1,0 +1,83 @@
+name: 🚀 Build services
+
+on:
+  workflow_dispatch:
+    inputs:
+      targets:
+        description: "Сервисы через запятую или '*' (all)"
+        required: true
+        default: "*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.out.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: discover
+        name: 🔍 Search for all services with Dockerfile
+        run: |
+            mapfile -t ALL_SERVICES < <(find . -mindepth 2 -maxdepth 2 -type f -name 'Dockerfile' -printf '%h\n' | sed 's|^\./||')
+
+            if [[ ${#ALL_SERVICES[@]} -eq 0 ]]; then
+            echo "::error::No Dockerfiles found"
+            exit 1
+            fi
+
+            printf '%s\n' "${ALL_SERVICES[@]}" > .services.list
+            echo "✅ Found: ${ALL_SERVICES[*]}"
+
+
+      - id: out
+        name: ⚙️ Processing the input parameter
+        run: |
+            INPUT="${{ github.event.inputs.targets }}"
+            echo "⏎ User input: [$INPUT]"
+
+            mapfile -t ALL_SERVICES < .services.list
+
+            if [[ -z "$INPUT" || "$INPUT" == "*" ]]; then
+            echo "💡 Get all services"
+            SEL=("${ALL_SERVICES[@]}")
+            else
+            IFS=',' read -ra SEL <<< "$(echo "$INPUT" | tr -d ' ')"
+            fi
+
+            declare -a OK=()
+            for s in "${SEL[@]}"; do
+            for a in "${ALL_SERVICES[@]}"; do
+                if [[ "$s" == "$a" ]]; then
+                OK+=("$s")
+                break
+                fi
+            done
+            [[ ! " ${OK[*]} " =~ " $s " ]] && echo "::warning::Service '$s' not found — ignore!"
+            done
+
+            if [[ ${#OK[@]} -eq 0 ]]; then
+            echo "::error::No valid services for build"
+            exit 1
+            fi
+
+            matrix=$(printf '%s\n' "${OK[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "matrix=$matrix" >> $GITHUB_OUTPUT
+            echo "✅ Services for build: $matrix"
+
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.prepare.outputs.matrix) }}
+
+    uses: ./.github/workflows/manual-build-service.yml
+    with:
+      service: ${{ matrix.service }}
+    secrets: inherit
