@@ -26,10 +26,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: 📛 Normalize service name to lowercase
+        id: normalize
+        run: |
+          echo "service_name=$(echo '${{ inputs.service }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: 📦 Build & Push ${{ inputs.service }}
         uses: docker/build-push-action@v5
         with:
           context: ./${{ inputs.service }}
           file: ./${{ inputs.service }}/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/${{ inputs.service }}:latest
+          tags: ghcr.io/${{ github.repository_owner }}/${{ steps.normalize.outputs.service_name }}:latest
